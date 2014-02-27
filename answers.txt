@@ -1,0 +1,11 @@
+# Partner 1
+Name: Alan Kha
+Student ID: 904030522
+Email: akhahaha@gmail.com
+
+# Partner 2 (if you're working in a team)
+Name: Braden Anderson
+Student ID: 203744563
+Email: bradencanderson@gmail.com
+
+# Add any other information you'd like us to know below this line.
