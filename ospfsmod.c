@@ -15,8 +15,6 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 
-#define MIN(X,Y) ((X) < (Y) ? (X) : (Y))
-
 /****************************************************************************
  * ospfsmod
  *
@@ -420,7 +418,7 @@ ospfs_dir_lookup(struct inode *dir, struct dentry *dentry, struct nameidata *ign
 //   Returns: 1 at end of directory, 0 if filldir returns < 0 before the end
 //     of the directory, and -(error number) on error.
 //
-//   EXERCISE: Finish implementing this function.
+//   EXERCISE: Finish implementing this function. (DONE)
 
 static int
 ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
@@ -481,7 +479,7 @@ ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		// get inode
 		od = ospfs_inode_data(dir_oi, f_pos * OSPFS_DIRENTRY_SIZE);
 		entry_oi = ospfs_inode(od->od_ino);
-		
+
 		// ignore blank directory entries
 		if(entry_oi != 0) {
 			// determine filetype
@@ -496,10 +494,10 @@ ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
 					ok_so_far = filldir(dirent, od->od_name, strlen(od->od_name), f_pos, od->od_ino, DT_LNK);
 					break;
 				default: eprintk("Mystery error!\n"); r=1; continue;
-				
+
 			}
 		}
-		
+
 		f_pos++;
 	}
 
@@ -577,7 +575,16 @@ ospfs_unlink(struct inode *dirino, struct dentry *dentry)
 static uint32_t
 allocate_block(void)
 {
-	/* EXERCISE: Your code here */
+	void *bitmap = ospfs_block(OSPFS_FREEMAP_BLK);
+
+	int i; // iterate through bitmap vector and return first free block
+	for (i = 0; i < ospfs_super->os_nblocks; i++) {
+		if (bitvector_test(bitmap, i)) {
+			bitvector_clear(bitmap, i); // mark as used (set i bit to 0)
+			return i;
+		}
+	}
+
 	return 0;
 }
 
@@ -596,7 +603,11 @@ allocate_block(void)
 static void
 free_block(uint32_t blockno)
 {
-	/* EXERCISE: Your code here */
+	void *bitmap = ospfs_block(OSPFS_FREEMAP_BLK);
+
+	// TODO: check validity of block
+
+	bitvector_set(bitmap, blockno); // mark as free (set i bit to 1)
 }
 
 
@@ -858,7 +869,7 @@ ospfs_notify_change(struct dentry *dentry, struct iattr *attr)
 //   as 'f_pos'; read data starting at that position, and update the position
 //   when you're done.
 //
-//   EXERCISE: Complete this function.
+//   EXERCISE: Complete this function. (DONE)
 
 static ssize_t
 ospfs_read(struct file *filp, char __user *buffer, size_t count, loff_t *f_pos)
@@ -894,7 +905,7 @@ ospfs_read(struct file *filp, char __user *buffer, size_t count, loff_t *f_pos)
 		n = (count + (*f_pos % OSPFS_BLKSIZE) - amount > OSPFS_BLKSIZE ?
 			OSPFS_BLKSIZE - (*f_pos % OSPFS_BLKSIZE) : count - amount);
 		retval = copy_to_user(buffer,data,n);
-		
+
 		if (retval < 0) {
 			retval = -EFAULT;
 			goto done;
@@ -925,7 +936,7 @@ ospfs_read(struct file *filp, char __user *buffer, size_t count, loff_t *f_pos)
 //   where you cannot read past the end of the file, it is OK to write past
 //   the end of the file; this should simply change the file's size.
 //
-//   EXERCISE: Complete this function.
+//   EXERCISE: Complete this function. (DONE)
 
 static ssize_t
 ospfs_write(struct file *filp, const char __user *buffer, size_t count, loff_t *f_pos)
@@ -960,21 +971,20 @@ ospfs_write(struct file *filp, const char __user *buffer, size_t count, loff_t *
 			goto done;
 		}
 
-	//	data = ospfs_block(blockno);
-		// this seems to be a buggy line in the skeleton code.
-		data = ospfs_block(blockno) + (*f_pos % OSPFS_BLKSIZE);
+		data = ospfs_block(blockno);
 
 		// Figure out how much data is left in this block to write.
 		// Copy data from user space. Return -EFAULT if unable to read
 		// read user space.
 		// Keep track of the number of bytes moved in 'n'.
 		n = OSPFS_BLKSIZE - (*f_pos % OSPFS_BLKSIZE);
-		
-		n = MIN(n, count - amount);
-		
-		if (copy_from_user(data, buffer, n) != 0)
+
+		if (n > count - amount)
+			n = count - amount;
+
+		if (copy_from_user(data + (*f_pos % OSPFS_BLKSIZE), buffer, n) != 0)
 			return -EFAULT;
-		
+
 		buffer += n;
 		amount += n;
 		*f_pos += n;
