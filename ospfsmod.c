@@ -857,8 +857,57 @@ remove_block(ospfs_inode_t *oi)
 	// current number of blocks in file
 	uint32_t n = ospfs_size2nblocks(oi->oi_size);
 
-	/* EXERCISE: Your code here */
-	return -EIO; // Replace this line
+	// TODO: do blocks start at 1? or do I have to do n-1
+
+	// remove direct block
+	if (n < OSPFS_NDIRECT) {
+		// free direct block
+		free_block(n);
+		oi->oi_direct[n] = 0;
+	}
+	// remove indirect block
+	else if (n < OSPFS_NDIRECT + OSPFS_NINDIRECT) {
+		uint32_t* indir = (uint32_t *) ospfs_block(oi->oi_indirect);
+
+		// free direct block
+		free_block(indir[direct_index(n)]);
+		indir[direct_index(n)] = 0;
+
+		// free indirect block if possible
+		if (direct_index(n) == 0) {
+			free_block(oi->oi_indirect);
+			oi->oi_indirect = 0;
+		}
+	}
+	// remove indirect^2 block
+	else if (indir2_index(n) == 0) {
+		uint32_t* indir2 = (uint32_t *) ospfs_block(oi->oi_indirect2);
+		uint32_t* indir = (uint32_t *) ospfs_block(indir2[indir_index(n)]);
+
+		// free direct block
+		free_block(indir[direct_index(n)]);
+		indir[direct_index(n)] = 0;
+
+		// free indirect block if possible
+		if (direct_index(n) == 0) {
+			free_block(indir2[indir_index(n)]);
+			indir2[indir_index(n)] = 0;
+		}
+
+		// free indirect^2 block if possible
+		if (indir_index(n) == 0) {
+			free_block(oi->oi_indirect2);
+			oi->oi_indirect2 = 0;
+		}
+	}
+	// bad size
+	else
+		return -EIO;
+
+	// update filesize
+	oi->oi_size -= OSPFS_BLKSIZE;
+
+	return 0;
 }
 
 
