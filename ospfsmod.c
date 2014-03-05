@@ -945,7 +945,7 @@ remove_block(ospfs_inode_t *oi)
 //         (The value that the final add_block or remove_block set it to
 //          is probably not correct).
 //
-//   EXERCISE: Finish off this function.
+//   EXERCISE: Finish off this function. (DONE)
 
 static int
 change_size(ospfs_inode_t *oi, uint32_t new_size)
@@ -953,18 +953,34 @@ change_size(ospfs_inode_t *oi, uint32_t new_size)
 	uint32_t old_size = oi->oi_size;
 	int r = 0;
 
+	// grow
 	while (ospfs_size2nblocks(oi->oi_size) < ospfs_size2nblocks(new_size)) {
-	        /* EXERCISE: Your code here */
-		return -EIO; // Replace this line
-	}
-	while (ospfs_size2nblocks(oi->oi_size) > ospfs_size2nblocks(new_size)) {
-	        /* EXERCISE: Your code here */
-		return -EIO; // Replace this line
+		r = add_block(oi);
+		if (r < 0)
+			break;
 	}
 
-	/* EXERCISE: Make sure you update necessary file meta data
-	             and return the proper value. */
-	return -EIO; // Replace this line
+	if (r == -EIO)
+		return -EIO;
+	else if (r == -ENOSPC) {
+		// shrink back to old size
+		while (ospfs_size2nblocks(oi->oi_size) > ospfs_size2nblocks(old_size))
+			r = remove_block(oi);
+
+		oi->oi_size = old_size;
+		return -ENOSPC;
+	}
+
+	while (ospfs_size2nblocks(oi->oi_size) > ospfs_size2nblocks(new_size)) {
+		r = remove_block(oi);
+		if (r < 0)
+			return r;
+	}
+
+	// update to exact size
+	oi->oi_size = new_size;
+
+	return 0;
 }
 
 
@@ -1237,12 +1253,33 @@ create_blank_direntry(ospfs_inode_t *dir_oi)
 //               -ENOSPC       if the disk is full & the file can't be created;
 //               -EIO          on I/O error.
 //
-//   EXERCISE: Complete this function.
+//   EXERCISE: Complete this function. (DONE)
 
 static int
 ospfs_link(struct dentry *src_dentry, struct inode *dir, struct dentry *dst_dentry) {
-	/* EXERCISE: Your code here. */
-	return -EINVAL;
+	ospfs_direntry_t* link;
+
+	// check if name too long
+	if(dst_dentry->d_name.len > OSPFS_MAXNAMELEN)
+        return -ENAMETOOLONG;
+	// check if directory entry already exists
+	if (!find_direntry(ospfs_inode(dir->i_ino),
+		dst_dentry->d_name.name, dst_dentry->d_name.len))
+		return -EEXIST;
+
+	// create new hardlinked file
+	link = create_blank_direntry(ospfs_inode(dir->i_ino));
+	if (IS_ERR(link))
+		return PTR_ERR(link);
+
+	// copy file information
+	memcpy(link->od_name, dst_dentry->d_name.name, dst_dentry->d_name.len);
+	link->od_ino = src_dentry->d_inode->i_ino;
+
+	// increment source file link count
+	ospfs_inode(src_dentry->d_inode->i_ino)->oi_nlink++;
+
+	return 0;
 }
 
 // ospfs_create
