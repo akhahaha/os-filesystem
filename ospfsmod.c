@@ -1215,15 +1215,32 @@ find_direntry(ospfs_inode_t *dir_oi, const char *name, int namelen)
 static ospfs_direntry_t *
 create_blank_direntry(ospfs_inode_t *dir_oi)
 {
-	// Outline:
-	// 1. Check the existing directory data for an empty entry.  Return one
-	//    if you find it.
-	// 2. If there's no empty entries, add a block to the directory.
-	//    Use ERR_PTR if this fails; otherwise, clear out all the directory
-	//    entries and return one of them.
+	ospfs_direntry_t *od;
+	uint32_t offset;
+	int retval;
+	
+	// Check the existing directory data for an empty entry.
+	for (offset = 0; offset < dir_oi->oi_size; offset += OSPFS_DIRENTRY_SIZE) {
+		od = ospfs_inode_data(dir_oi, offset);
+		// If we find an existing empty entry, return it
+		if (od->od_ino) {
+			*(od->od_name) = 0;
+			return od;
+		}
+	}
+	//    If there's no empty entries, add a block to the directory.
+	//    (increase size by OSPFS_DIRENTRY_SIZE)
+	retval = change_size (dir_oi, dir_oi->oi_size + OSPFS_DIRENTRY_SIZE);
+	
+	// if failed to resize directory
+	if (retval < 0)
+		return ERR_PTR(retval);
+	
+	od = ospfs_inode_data(dir_oi, dir_oi->oi_size - OSPFS_DIRENTRY_SIZE);
+	od->od_ino = 0;
+	*(od->od_name) = 0;
 
-	/* EXERCISE: Your code here. */
-	return ERR_PTR(-EINVAL); // Replace this line
+	return od;
 }
 
 // ospfs_link(src_dentry, dir, dst_dentry
@@ -1316,8 +1333,16 @@ ospfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidat
 {
 	ospfs_inode_t *dir_oi = ospfs_inode(dir->i_ino);
 	uint32_t entry_ino = 0;
-	/* EXERCISE: Your code here. */
-	return -EINVAL; // Replace this line
+	
+	// check name length
+	if (dentry->d_name.len > OSPFS_MAXNAMELEN)
+		return -ENAMETOOLONG;
+	
+	// check if file already exists
+	if (find_direntry(dir_oi, dentry->d_name.name, dentry->d_name.len))
+		return -EEXIST;
+		
+		/* EXERCISE */
 
 	/* Execute this code after your function has successfully created the
 	   file.  Set entry_ino to the created file's inode number before
