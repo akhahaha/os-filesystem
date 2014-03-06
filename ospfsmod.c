@@ -543,6 +543,7 @@ ospfs_unlink(struct inode *dirino, struct dentry *dentry)
 	}
 
 	od->od_ino = 0;
+	memset(od->od_name, 0, OSPFS_MAXNAMELEN+1);
 	oi->oi_nlink--;
 
 	// if not a symlink, delete file data when all links are gone
