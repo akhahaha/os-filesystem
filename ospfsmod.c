@@ -1445,15 +1445,10 @@ ospfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 		return -ENOSPC;
 
 	// create new symlinked file
-/*	entry_ino = ospfs_create(dir, dentry, dir_oi->oi_mode, NULL);
-	if (entry_ino < 0)
-		return entry_ino;
-	entry_ino = find_direntry(ospfs_inode(dir->i_ino),
-		dentry->d_name.name, dentry->d_name.len)->od_ino;
-	link = (ospfs_symlink_inode_t*) ospfs_inode(entry_ino);*/
 	
 	// initialize directory entry
 	dir_entry->od_ino = entry_ino;
+	memset(dir_entry->od_name, 0, OSPFS_MAXNAMELEN+1);
 	memcpy(dir_entry->od_name, dentry->d_name.name, dentry->d_name.len);
 	// copy file information
 	link->oi_size = strlen(symname);
@@ -1462,7 +1457,6 @@ ospfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 	// fill link->oi_symlink with zeroes.
 	memcpy(link->oi_symlink, symname, strlen(symname));
 	
-	eprintk("created symlink at ino %d\n", entry_ino);
 	/* Execute this code after your function has successfully created the
 	   file.  Set entry_ino to the created file's inode number before
 	   getting here. */
@@ -1493,13 +1487,11 @@ ospfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 static void *
 ospfs_follow_link(struct dentry *dentry, struct nameidata *nd)
 {
-	eprintk("following symlink at ino %d\n", dentry->d_inode->i_ino);
 	ospfs_symlink_inode_t *oi =
 		(ospfs_symlink_inode_t *) ospfs_inode(dentry->d_inode->i_ino);
 
 	// check for conditional symlink
 	if (strncmp(oi->oi_symlink, "root?", 5) == 0) {
-		eprintk("conditional symlink.\n");
 		// find the pivot between first and second paths
 		int pivot = strchr(oi->oi_symlink, ':') - oi->oi_symlink;
 
@@ -1514,7 +1506,6 @@ ospfs_follow_link(struct dentry *dentry, struct nameidata *nd)
 			nd_set_link(nd, oi->oi_symlink + pivot + 1); // use second path
 	}
 	else {
-		eprintk("normal symlink: %s\n", oi->oi_symlink);
 		nd_set_link(nd, oi->oi_symlink);
 	}
 
