@@ -417,6 +417,8 @@ ospfs_dir_lookup(struct inode *dir, struct dentry *dentry, struct nameidata *ign
 //
 //   Returns: 1 at end of directory, 0 if filldir returns < 0 before the end
 //     of the directory, and -(error number) on error.
+//
+//   EXERCISE: Finish implementing this function. (DONE)
 
 static int
 ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
@@ -635,6 +637,8 @@ free_block(uint32_t blockno)
 //		 block, 1 for the second, etc.)
 // Returns: 0 if block index 'b' requires using the doubly indirect
 //	       block, -1 if it does not.
+//
+// EXERCISE: Fill in this function. (DONE)
 
 static int32_t
 indir2_index(uint32_t b)
@@ -654,6 +658,8 @@ indir2_index(uint32_t b)
 //	    0 if b is located under the file's first indirect block;
 //	    otherwise, the offset of the relevant indirect block within
 //		the doubly indirect block.
+//
+// EXERCISE: Fill in this function. (DONE)
 
 static int32_t
 indir_index(uint32_t b)
@@ -673,6 +679,8 @@ indir_index(uint32_t b)
 // Inputs:  b -- the zero-based index of the file block
 // Returns: the index of block b in the relevant indirect block or the direct
 //	    block array.
+//
+// EXERCISE: Fill in this function. (DONE)
 
 static int32_t
 direct_index(uint32_t b)
@@ -699,6 +707,8 @@ direct_index(uint32_t b)
 //          fit in oi's data blocks.  If the function returns an error,
 //          then oi->oi_size should remain unchanged. Any newly
 //          allocated blocks should be erased (set to zero).
+//
+// EXERCISE: Finish off this function. (DONE)
 //
 // Remember that allocating a new data block may require allocating
 // as many as three disk blocks, depending on whether a new indirect
@@ -934,6 +944,8 @@ remove_block(ospfs_inode_t *oi)
 //   Also: Don't forget to change the size field in the metadata of the file.
 //         (The value that the final add_block or remove_block set it to
 //          is probably not correct).
+//
+//   EXERCISE: Finish off this function. (DONE)
 
 static int
 change_size(ospfs_inode_t *oi, uint32_t new_size)
@@ -1021,6 +1033,8 @@ ospfs_notify_change(struct dentry *dentry, struct iattr *attr)
 //   The current file position is passed into the function
 //   as 'f_pos'; read data starting at that position, and update the position
 //   when you're done.
+//
+//   EXERCISE: Complete this function. (DONE)
 
 static ssize_t
 ospfs_read(struct file *filp, char __user *buffer, size_t count, loff_t *f_pos)
@@ -1085,6 +1099,8 @@ ospfs_read(struct file *filp, char __user *buffer, size_t count, loff_t *f_pos)
 //   into the file.  Use copy_from_user() to accomplish this. Unlike read(),
 //   where you cannot read past the end of the file, it is OK to write past
 //   the end of the file; this should simply change the file's size.
+//
+//   EXERCISE: Complete this function. (DONE)
 
 static ssize_t
 ospfs_write(struct file *filp, const char __user *buffer, size_t count, loff_t *f_pos)
@@ -1193,35 +1209,37 @@ find_direntry(ospfs_inode_t *dir_oi, const char *name, int namelen)
 //	}
 //
 //	The create_blank_direntry function should use this convention.
+//
+// EXERCISE: Write this function. (DONE)
 
 static ospfs_direntry_t *
 create_blank_direntry(ospfs_inode_t *dir_oi)
 {
-	ospfs_direntry_t *od;
-	uint32_t offset;
+	// Outline:
+	// 1. Check the existing directory data for an empty entry.  Return one
+	//    if you find it.
+	// 2. If there's no empty entries, add a block to the directory.
+	//    Use ERR_PTR if this fails; otherwise, clear out all the directory
+	//    entries and return one of them.
+
+	ospfs_direntry_t *dir_entry;
 	int retval;
-	
-	// Check the existing directory data for an empty entry.
+
+	// look for empty entry
+	uint32_t offset;
 	for (offset = 0; offset < dir_oi->oi_size; offset += OSPFS_DIRENTRY_SIZE) {
-		od = ospfs_inode_data(dir_oi, offset);
-		// If we find an existing empty entry, return it
-		if (od->od_ino) {
-			*(od->od_name) = 0;
-			return od;
-		}
+		dir_entry = ospfs_inode_data(dir_oi, offset);
+		if (dir_entry->od_ino == 0)
+			return dir_entry;
 	}
-	//    If there's no empty entries, add a block to the directory.
-	//    (increase size by OSPFS_DIRENTRY_SIZE)
-	retval = change_size (dir_oi, dir_oi->oi_size + OSPFS_DIRENTRY_SIZE);
-	// if failed to resize directory
+	
+	// no empty entry, add block (will be added at offset = current oi_size)
+	retval = add_block(dir_oi);
 	if (retval < 0)
 		return ERR_PTR(retval);
-	
-	od = ospfs_inode_data(dir_oi, dir_oi->oi_size - OSPFS_DIRENTRY_SIZE);
-	od->od_ino = 0;
-	*(od->od_name) = 0;
 
-	return od;
+	dir_entry = ospfs_inode_data(dir_oi, offset);
+	return dir_entry;
 }
 
 // ospfs_link(src_dentry, dir, dst_dentry
@@ -1250,13 +1268,15 @@ create_blank_direntry(ospfs_inode_t *dir_oi)
 //                             exists in the given 'dir';
 //               -ENOSPC       if the disk is full & the file can't be created;
 //               -EIO          on I/O error.
+//
+//   EXERCISE: Complete this function. (DONE)
 
 static int
 ospfs_link(struct dentry *src_dentry, struct inode *dir, struct dentry *dst_dentry) {
 	ospfs_direntry_t* link;
 
 	// check if name too long
-	if(dst_dentry->d_name.len > OSPFS_MAXNAMELEN)
+	if (dst_dentry->d_name.len > OSPFS_MAXNAMELEN)
         return -ENAMETOOLONG;
 	// check if directory entry already exists
 	if (!find_direntry(ospfs_inode(dir->i_ino),
@@ -1304,51 +1324,48 @@ ospfs_link(struct dentry *src_dentry, struct inode *dir, struct dentry *dst_dent
 //	helper functions above.
 //   2. Find an empty inode.  Set the 'entry_ino' variable to its inode number.
 //   3. Initialize the directory entry and inode.
+//
+//   EXERCISE: Complete this function.
 
 static int
 ospfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidata *nd)
 {
 	ospfs_inode_t *dir_oi = ospfs_inode(dir->i_ino);
-	uint32_t entry_ino;
-	ospfs_inode_t *ino;
-	ospfs_direntry_t *entry;
-	entry_ino = 0;
-
-	// check name length
-	if (dentry->d_name.len > OSPFS_MAXNAMELEN)
-		return -ENAMETOOLONG;
+	ospfs_direntry_t *dir_entry;
+	ospfs_inode_t *inode;
+	uint32_t entry_ino = 0;
 	
-	// check if file already exists
-	if (find_direntry(dir_oi, dentry->d_name.name, dentry->d_name.len))
+	// check if name too long
+	if (dentry->d_name.len > OSPFS_MAXNAMELEN)
+        return -ENAMETOOLONG;
+	// check if directory entry already exists
+	if (!find_direntry(ospfs_inode(dir->i_ino), 
+		dentry->d_name.name, dentry->d_name.len))
 		return -EEXIST;
 		
-	// create new entry in dir_oi
-	entry = create_blank_direntry(dir_oi);
-	
-	// look through all inodes on disk, find an empty inode
-	do {
-		ino = ospfs_inode(entry_ino);
+	// create new directory entry
+	dir_entry = create_blank_direntry(dir_oi);
+	if (IS_ERR(dir_entry))
+		return PTR_ERR(dir_entry);
 		
-		entry_ino++;
-	} while (ino != 0 && (ino->oi_nlink != 0));
-	
-	// we were unable to find an empty inode
+	// find empty inode
+	for (entry_ino = 0; entry_ino < ospfs_super->os_ninodes; entry_ino++) {
+		inode = ospfs_inode(entry_ino);
+		if (inode->oi_nlink == 0)
+			break; // empty inode
+	}
 	if (entry_ino == ospfs_super->os_ninodes)
 		return -ENOSPC;
-	entry_ino--;
-	ino->oi_nlink++;
-	ino->oi_size = 0;
-	ino->oi_mode = mode;
-	ino->oi_ftype = OSPFS_FTYPE_REG;
-	ino->oi_indirect = 0;
-	ino->oi_indirect2 = 0;
-	
-	memset(ino->oi_direct, 0, OSPFS_NDIRECT * sizeof(ino->oi_direct[0]));
-	
-	entry->od_ino = entry_ino;
-	memcpy(entry->od_name, dentry->d_name.name, dentry->d_name.len);
-	entry->od_name[dentry->d_name.len] = 0; // null-terminated string
-	
+		
+	// initialize directory entry
+	dir_entry->od_ino = entry_ino;
+	memcpy(dir_entry->od_name, dentry->d_name.name, dentry->d_name.len);
+	// initialize file
+	inode->oi_size = 0;
+	inode->oi_ftype = OSPFS_FTYPE_REG;
+	inode->oi_mode = mode;
+	inode->oi_nlink = 1;
+
 	/* Execute this code after your function has successfully created the
 	   file.  Set entry_ino to the created file's inode number before
 	   getting here. */
