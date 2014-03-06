@@ -1399,16 +1399,36 @@ ospfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidat
 //               -ENOSPC       if the disk is full & the file can't be created;
 //               -EIO          on I/O error.
 //
-//   EXERCISE: Complete this function.
+//   EXERCISE: Complete this function. (DONE)
 
 static int
 ospfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 {
 	ospfs_inode_t *dir_oi = ospfs_inode(dir->i_ino);
 	uint32_t entry_ino = 0;
+	ospfs_symlink_inode_t* link;
 
-	/* EXERCISE: Your code here. */
-	return -EINVAL;
+	// check if name too long
+	if (dentry->d_name.len > OSPFS_MAXNAMELEN)
+        return -ENAMETOOLONG;
+	// check if directory entry already exists
+	if (!find_direntry(ospfs_inode(dir->i_ino),
+		dentry->d_name.name, dentry->d_name.len))
+		return -EEXIST;
+		
+	// create new symlinked file
+	entry_ino = ospfs_create(dir, dentry, dir_oi->oi_mode, NULL);
+	if (entry_ino < 0)
+		return entry_ino;
+	entry_ino = (uint32_t) find_direntry(ospfs_inode(dir->i_ino),
+		dentry->d_name.name, dentry->d_name.len);
+	link = (ospfs_symlink_inode_t*) ospfs_inode(entry_ino);
+
+	// copy file information
+	link->oi_size = strlen(symname);
+	link->oi_ftype = OSPFS_FTYPE_SYMLINK;
+	link->oi_nlink = 1;
+	memcpy(link->oi_symlink, symname, strlen(symname));
 
 	/* Execute this code after your function has successfully created the
 	   file.  Set entry_ino to the created file's inode number before
