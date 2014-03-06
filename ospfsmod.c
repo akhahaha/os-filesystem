@@ -1232,7 +1232,7 @@ create_blank_direntry(ospfs_inode_t *dir_oi)
 		if (dir_entry->od_ino == 0)
 			return dir_entry;
 	}
-	
+
 	// no empty entry, add block (will be added at offset = current oi_size)
 	retval = add_block(dir_oi);
 	if (retval < 0)
@@ -1279,7 +1279,7 @@ ospfs_link(struct dentry *src_dentry, struct inode *dir, struct dentry *dst_dent
 	if (dst_dentry->d_name.len > OSPFS_MAXNAMELEN)
         return -ENAMETOOLONG;
 	// check if directory entry already exists
-	if (!find_direntry(ospfs_inode(dir->i_ino),
+	if (find_direntry(ospfs_inode(dir->i_ino),
 		dst_dentry->d_name.name, dst_dentry->d_name.len))
 		return -EEXIST;
 
@@ -1334,20 +1334,19 @@ ospfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidat
 	ospfs_direntry_t *dir_entry;
 	ospfs_inode_t *inode;
 	uint32_t entry_ino = 0;
-	
+
 	// check if name too long
 	if (dentry->d_name.len > OSPFS_MAXNAMELEN)
         return -ENAMETOOLONG;
 	// check if directory entry already exists
-	if (!find_direntry(ospfs_inode(dir->i_ino), 
-		dentry->d_name.name, dentry->d_name.len))
+	if (find_direntry(dir_oi, dentry->d_name.name, dentry->d_name.len))
 		return -EEXIST;
-		
+
 	// create new directory entry
 	dir_entry = create_blank_direntry(dir_oi);
 	if (IS_ERR(dir_entry))
 		return PTR_ERR(dir_entry);
-		
+
 	// find empty inode
 	for (entry_ino = 0; entry_ino < ospfs_super->os_ninodes; entry_ino++) {
 		inode = ospfs_inode(entry_ino);
@@ -1356,7 +1355,7 @@ ospfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidat
 	}
 	if (entry_ino == ospfs_super->os_ninodes)
 		return -ENOSPC;
-		
+
 	// initialize directory entry
 	dir_entry->od_ino = entry_ino;
 	memcpy(dir_entry->od_name, dentry->d_name.name, dentry->d_name.len);
@@ -1412,10 +1411,9 @@ ospfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 	if (dentry->d_name.len > OSPFS_MAXNAMELEN)
         return -ENAMETOOLONG;
 	// check if directory entry already exists
-	if (!find_direntry(ospfs_inode(dir->i_ino),
-		dentry->d_name.name, dentry->d_name.len))
+	if (find_direntry(dir_oi, dentry->d_name.name, dentry->d_name.len))
 		return -EEXIST;
-		
+
 	// create new symlinked file
 	entry_ino = ospfs_create(dir, dentry, dir_oi->oi_mode, NULL);
 	if (entry_ino < 0)
