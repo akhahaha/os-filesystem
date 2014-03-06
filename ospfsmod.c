@@ -1421,6 +1421,7 @@ ospfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 	ospfs_inode_t *dir_oi = ospfs_inode(dir->i_ino);
 	uint32_t entry_ino = 0;
 	ospfs_symlink_inode_t* link;
+	ospfs_direntry_t *dir_entry;
 
 	// check if name too long
 	if (dentry->d_name.len > OSPFS_MAXNAMELEN)
@@ -1429,20 +1430,39 @@ ospfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 	if (find_direntry(dir_oi, dentry->d_name.name, dentry->d_name.len))
 		return -EEXIST;
 
+	// create new directory entry
+	dir_entry = create_blank_direntry(dir_oi);
+	if (IS_ERR(dir_entry))
+		return PTR_ERR(dir_entry);
+
+	// find empty inode
+	for (entry_ino = 0; entry_ino < ospfs_super->os_ninodes; entry_ino++) {
+		link = (ospfs_symlink_inode_t*) ospfs_inode(entry_ino);
+		if (link->oi_nlink == 0)
+			break; // empty inode
+	}
+	if (entry_ino == ospfs_super->os_ninodes)
+		return -ENOSPC;
+
 	// create new symlinked file
-	entry_ino = ospfs_create(dir, dentry, dir_oi->oi_mode, NULL);
+/*	entry_ino = ospfs_create(dir, dentry, dir_oi->oi_mode, NULL);
 	if (entry_ino < 0)
 		return entry_ino;
 	entry_ino = find_direntry(ospfs_inode(dir->i_ino),
 		dentry->d_name.name, dentry->d_name.len)->od_ino;
-	link = (ospfs_symlink_inode_t*) ospfs_inode(entry_ino);
-
+	link = (ospfs_symlink_inode_t*) ospfs_inode(entry_ino);*/
+	
+	// initialize directory entry
+	dir_entry->od_ino = entry_ino;
+	memcpy(dir_entry->od_name, dentry->d_name.name, dentry->d_name.len);
 	// copy file information
 	link->oi_size = strlen(symname);
 	link->oi_ftype = OSPFS_FTYPE_SYMLINK;
 	link->oi_nlink = 1;
+	// fill link->oi_symlink with zeroes.
 	memcpy(link->oi_symlink, symname, strlen(symname));
-
+	
+	eprintk("created symlink at ino %d\n", entry_ino);
 	/* Execute this code after your function has successfully created the
 	   file.  Set entry_ino to the created file's inode number before
 	   getting here. */
@@ -1473,11 +1493,13 @@ ospfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 static void *
 ospfs_follow_link(struct dentry *dentry, struct nameidata *nd)
 {
+	eprintk("following symlink at ino %d\n", dentry->d_inode->i_ino);
 	ospfs_symlink_inode_t *oi =
 		(ospfs_symlink_inode_t *) ospfs_inode(dentry->d_inode->i_ino);
 
 	// check for conditional symlink
 	if (strncmp(oi->oi_symlink, "root?", 5) == 0) {
+		eprintk("conditional symlink.\n");
 		// find the pivot between first and second paths
 		int pivot = strchr(oi->oi_symlink, ':') - oi->oi_symlink;
 
@@ -1491,8 +1513,10 @@ ospfs_follow_link(struct dentry *dentry, struct nameidata *nd)
 		else
 			nd_set_link(nd, oi->oi_symlink + pivot + 1); // use second path
 	}
-	else
+	else {
+		eprintk("normal symlink: %s\n", oi->oi_symlink);
 		nd_set_link(nd, oi->oi_symlink);
+	}
 
 	return (void *) 0;
 }
