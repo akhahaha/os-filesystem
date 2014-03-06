@@ -97,6 +97,21 @@ close FOO;
 	  '15'
 	],
 
+	# 18: symlinks
+	[ 'ln -s test/hello.txt test/thelink ; echo "World" >> test/hello.txt ; diff test/hello.txt test/thelink && echo Same contents ; rm test/thelink',
+	  'Same contents'
+	]
+
+	# 19: conditional symlinks as root
+	[ 'echo "Not root" > test/notroot ; echo "Root" > test/root ; ln -s root?test/root:test/notroot test/amiroot ; cat test/amiroot',
+	  'Root'
+	],
+
+	# 20: conditional symlinks as non-root
+	[ 'echo "Not root" > test/notroot ; echo "Root" > test/root ; ln -s root?test/root:test/notroot test/amiroot ; su user -c "cat test/amiroot"',
+	  'Not root'
+	],
+
 );
 
 my($ntest) = 0;

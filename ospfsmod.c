@@ -1432,8 +1432,8 @@ ospfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 	entry_ino = ospfs_create(dir, dentry, dir_oi->oi_mode, NULL);
 	if (entry_ino < 0)
 		return entry_ino;
-	entry_ino = (uint32_t) find_direntry(ospfs_inode(dir->i_ino),
-		dentry->d_name.name, dentry->d_name.len);
+	entry_ino = find_direntry(ospfs_inode(dir->i_ino),
+		dentry->d_name.name, dentry->d_name.len)->od_ino;
 	link = (ospfs_symlink_inode_t*) ospfs_inode(entry_ino);
 
 	// copy file information
@@ -1467,15 +1467,32 @@ ospfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 //     root?/path/1:/path/2.
 //   (hint: Should the given form be changed in any way to make this method
 //   easier?  With which character do most functions expect C strings to end?)
+//   (DONE)
 
 static void *
 ospfs_follow_link(struct dentry *dentry, struct nameidata *nd)
 {
 	ospfs_symlink_inode_t *oi =
 		(ospfs_symlink_inode_t *) ospfs_inode(dentry->d_inode->i_ino);
-	// Exercise: Your code here.
 
-	nd_set_link(nd, oi->oi_symlink);
+	// check for conditional symlink
+	if (strncmp(oi->oi_symlink, "root?", 5) == 0) {
+		// find the pivot between first and second paths
+		int pivot = strchr(oi->oi_symlink, ':') - oi->oi_symlink;
+
+		// root user
+		if (current->uid == 0) {
+			// use null-terminator to indicate ending
+			oi->oi_symlink[pivot] = '\0';
+			nd_set_link(nd, oi->oi_symlink + 5); // use first path
+		}
+		// normal user
+		else
+			nd_set_link(nd, oi->oi_symlink + pivot + 1); // use second path
+	}
+	else
+		nd_set_link(nd, oi->oi_symlink);
+
 	return (void *) 0;
 }
 
