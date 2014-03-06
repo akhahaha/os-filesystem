@@ -97,17 +97,27 @@ close FOO;
 	  '15'
 	],
 
-	# 18: symlinks
+	# 18: overwriting files should affect all hardlinks to that file
+	[ 'echo hello > test/hardlinktest ; ln test/hardlinktest test/hardlinktest2 ; echo goodbye > test/hardlinktest2 ; cat test/hardlinktest ; rm test/hardlinktest2',
+	  'goodbye'
+	],
+	
+	# 19: removing one hardlink should not remove the file itself
+	[ 'echo hello > test/filetoremove ; ln test/filetoremove test/filetokeep ; echo goodbye > test/filetoremove ; rm test/filetoremove ; cat test/filetokeep ; rm test/filetokeep',
+	  'goodbye'
+	],
+
+	# 20: symlinks
 	[ 'ln -s test/hello.txt test/thelink ; echo "World" >> test/hello.txt ; diff test/hello.txt test/thelink && echo Same contents ; rm test/thelink',
 	  'Same contents'
 	],
 
-	# 19: conditional symlinks as root
+	# 21: conditional symlinks as root
 	[ 'echo "Not root" > test/notroot ; echo "Root" > test/root ; ln -s root?test/root:test/notroot test/amiroot ; cat test/amiroot',
 	  'Root'
 	],
 
-	# 20: conditional symlinks as non-root
+	# 22: conditional symlinks as non-root
 	[ 'echo "Not root" > test/notroot ; echo "Root" > test/root ; ln -s root?test/root:test/notroot test/amiroot ; su user -c "cat test/amiroot"',
 	  'Not root'
 	],
