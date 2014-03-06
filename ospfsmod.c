@@ -517,7 +517,7 @@ ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
 //
 //   Returns: 0 if success and -ENOENT on entry not found.
 //
-//   EXERCISE: Make sure that deleting symbolic links works correctly.
+//   EXERCISE: Make sure that deleting symbolic links works correctly. (DONE)
 
 static int
 ospfs_unlink(struct inode *dirino, struct dentry *dentry)
@@ -544,6 +544,11 @@ ospfs_unlink(struct inode *dirino, struct dentry *dentry)
 
 	od->od_ino = 0;
 	oi->oi_nlink--;
+
+	// if not a symlink, delete file data when all links are gone
+	if (oi->oi_ftype != OSPFS_FTYPE_SYMLINK && oi->oi_nlink == 0)
+		return change_size(oi, 0);
+
 	return 0;
 }
 
