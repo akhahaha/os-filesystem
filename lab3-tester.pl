@@ -108,17 +108,17 @@ close FOO;
 	],
 
 	# 20: symlinks
-	[ 'ln -s test/hello.txt test/thelink ; echo "World" >> test/hello.txt ; diff test/hello.txt test/thelink && echo Same contents ; rm test/thelink',
+	[ 'ln -s test/hello.txt thelink ; echo "World" >> test/hello.txt ; diff test/hello.txt thelink && echo Same contents ; rm thelink',
 	  'Same contents'
 	],
 
 	# 21: conditional symlinks as root
-	[ 'echo "Not root" > test/notroot ; echo "Root" > test/root ; ln -s root?test/root:test/notroot test/amiroot ; cat test/amiroot',
+	[ 'echo "Not root" > notroot ; echo "Root" > root ; ln -s root?root:notroot amiroot ; cat amiroot',
 	  'Root'
 	],
 
 	# 22: conditional symlinks as non-root
-	[ 'echo "Not root" > test/notroot ; echo "Root" > test/root ; ln -s root?test/root:test/notroot test/amiroot ; su user -c "cat test/amiroot"',
+	[ 'su user -c "cat amiroot ; rm amiroot root notroot"',
 	  'Not root'
 	],
 
