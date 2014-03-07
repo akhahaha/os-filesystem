@@ -1564,6 +1564,6 @@ module_init(init_ospfs_fs)
 module_exit(exit_ospfs_fs)
 
 // Information about the module
-MODULE_AUTHOR("Skeletor");
+MODULE_AUTHOR("Alan Kha and Braden Anderson");
 MODULE_DESCRIPTION("OSPFS");
 MODULE_LICENSE("GPL");

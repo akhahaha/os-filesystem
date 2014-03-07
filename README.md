@@ -13,7 +13,11 @@ Implements a simple filesystem.
 
 Features
 ---------------
-
+- Directory reading and creation
+- File reading, writing, truncation, and appends
+- Block management
+- File and directory deletion
+- Symbolic and hard links
 
 Installation
 ---------------
@@ -22,4 +26,4 @@ Installation
 
 Limitations
 ---------------
-
+- Conditional symlinks implemented but not verified to be working
